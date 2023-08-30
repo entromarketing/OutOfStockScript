@@ -1,0 +1,101 @@
+// Out Of Stock Script From https://www.linkedin.com/in/bhavesh-t/
+
+// -------------------------
+// User Configuration Section
+// -------------------------
+// Please fill in your email address and spreadsheet URL. https://docs.google.com/spreadsheets/d/1nkujhXqb-ZQljp8khU71HBXOGDo-CFYQXbS-XTrTznk/copy
+
+// Full Instructions 
+
+function main() {
+    var mail = "youremail@domain.com";
+    var body = "Hello,\nThere are changes in the account.\n\n";
+    var url = 'your spreadsheet URL';
+
+    var sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Sheet1');
+
+    for (var i = 2; i < 10000; i++) {
+        var row = sheet.getRange(i, 1, 1, 5).getValues()[0];
+        var productUrl = row[0];
+        var campaignName = row[2].toString();
+        var adGroupName = row[3].toString();
+
+        // Exit loop if no URL provided
+        if (!productUrl) break;
+
+        var htmlCode = UrlFetchApp.fetch(productUrl, {muteHttpExceptions:true}).getContentText();
+        var isOutOfStock = htmlCode.indexOf('http://schema.org/OutOfStock') > -1;
+
+        Logger.log(`Processing ${productUrl}. Out of stock: ${isOutOfStock}`);
+
+        if (campaignName.includes("Shopping")) {
+            var changeMessage = handleShoppingCampaigns(campaignName, adGroupName, isOutOfStock, i, sheet);
+            if (changeMessage) {
+                body += changeMessage + "\n";
+            }
+        } else {
+            var changeMessage = handleRegularCampaigns(campaignName, adGroupName, isOutOfStock, i, sheet);
+            if (changeMessage) {
+                body += changeMessage + "\n";
+            }
+        }
+    }
+
+    if (body !== "Hello,\nThere are changes in the account.\n\n"){ 
+        MailApp.sendEmail(mail, 'Changes in the account.', body);
+    }
+}
+
+function handleRegularCampaigns(campaignName, adGroupName, isOutOfStock, rowNum, sheet) {
+    var message = "";
+    var campaigns = AdsApp.campaigns().withCondition(`Name = '${campaignName}'`).get();
+    while (campaigns.hasNext()) {
+        var campaign = campaigns.next();
+        var adGroups = campaign.adGroups().withCondition(`Name = '${adGroupName}'`).get();
+
+        while (adGroups.hasNext()) {
+            var adGroup = adGroups.next();
+            var currentStatus = adGroup.isEnabled() ? "Enabled." : "Paused.";
+            var newStatus = isOutOfStock ? "Paused." : "Enabled.";
+
+            if (currentStatus !== newStatus) {
+                if (isOutOfStock) {
+                    adGroup.pause();
+                } else {
+                    adGroup.enable();
+                }
+                message += `Campaign: ${campaignName}\nAdgroup: ${adGroupName}\nStatus: ${newStatus}\n`;
+            }
+            // Always update the status in the sheet
+            sheet.getRange(rowNum, 5).setValue(newStatus);
+        }
+    }
+    return message;
+}
+
+function handleShoppingCampaigns(campaignName, adGroupName, isOutOfStock, rowNum, sheet) {
+    var message = "";
+    var campaigns = AdsApp.shoppingCampaigns().withCondition(`Name = '${campaignName}'`).get();
+    while (campaigns.hasNext()) {
+        var campaign = campaigns.next();
+        var adGroups = campaign.adGroups().withCondition(`Name = '${adGroupName}'`).get();
+
+        while (adGroups.hasNext()) {
+            var adGroup = adGroups.next();
+            var currentStatus = adGroup.isEnabled() ? "Enabled." : "Paused.";
+            var newStatus = isOutOfStock ? "Paused." : "Enabled.";
+
+            if (currentStatus !== newStatus) {
+                if (isOutOfStock) {
+                    adGroup.pause();
+                } else {
+                    adGroup.enable();
+                }
+                message += `Campaign: ${campaignName}\nAdgroup: ${adGroupName}\nStatus: ${newStatus}\n`;
+            }
+            // Always update the status in the sheet
+            sheet.getRange(rowNum, 5).setValue(newStatus);
+        }
+    }
+    return message;
+}
