@@ -1,5 +1,10 @@
 # OutOfStockScript
 
+**Why Use It**
+
+https://www.linkedin.com/posts/bhavesh-t_first-post-have-felt-inspired-recently-by-activity-7102545899901390848-b_Qu
+
+
 **Setup:**
 
 The script is fairly straight forward. There are 2 requirements for the script to work properly.
