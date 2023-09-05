@@ -17,7 +17,7 @@ The script is fairly straight forward. There are 2 requirements for the script t
 
 5. Out of Stock Threshold Setting: This setting allows you to define a threshold level to manage the stock more efficiently. Once the stock level reaches this predefined threshold, the script will automatically pause the ad groups, preventing inefficient spending on nearly out-of-stock products.
 
-Installation: Copy the spreadsheet and populate it https://docs.google.com/spreadsheets/d/1nkujhXqb-ZQljp8khU71HBXOGDo-CFYQXbS-XTrTznk/copy 
+Installation: Copy the spreadsheet and populate it https://docs.google.com/spreadsheets/d/1WGnUoDb0Uu5AcYNLSwp0Ilr6nLAkH5T07Ve9UGjchOg/copy
 
 Download the script from https://github.com/entromarketing/OutOfStockScript/blob/main/v1
 
