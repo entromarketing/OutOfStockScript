@@ -2,7 +2,7 @@ function main() {
     var config = {
         mail: "youremail@domain.com", // Your Email address
         threshold: 0.7, // Your threshold percentage. Use 0.5% if you want to pause an ad group if 50% of the products associated with that label is out of stock.
-        sheetUrl: 'https://docs.google.com/spreadsheets/d/1WGnUoDb0Uu5AcYNLSwp0Ilr6nLAkH5T07Ve9UGjchOg/edit', // Your Google sheet
+        sheetUrl: 'https://docs.google.com/spreadsheets/d/1WGnUoDb0Uu5AcYNLSwp0Ilr6nLAkH5T07Ve9UGjchOg/copy', // Your Google sheet
     };
     var body = "Hello,\nThere are changes in the account.\n\n";
     var sheet = SpreadsheetApp.openByUrl(config.sheetUrl).getActiveSheet();
