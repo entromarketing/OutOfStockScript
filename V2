@@ -1,0 +1,254 @@
+function main() {
+    var config = {
+        mail: "youremail@domain.com", // Your Email address
+        threshold: 0.7, // Your threshold percentage. Use 0.5% if you want to pause an ad group if 50% of the products associated with that label is out of stock.
+        sheetUrl: 'https://docs.google.com/spreadsheets/d/1WGnUoDb0Uu5AcYNLSwp0Ilr6nLAkH5T07Ve9UGjchOg/edit', // Your Google sheet
+    };
+    var body = "Hello,\nThere are changes in the account.\n\n";
+    var sheet = SpreadsheetApp.openByUrl(config.sheetUrl).getActiveSheet();
+
+    var labeledProductsMap = {};
+
+    for (var i = 2; i < 10000; i++) {
+        var row = sheet.getRange(i, 1, 1, 7).getValues()[0];
+        var productUrl = row[0];
+        var label = row[5];
+
+        // Exit loop if no URL provided
+        if (!productUrl) {
+            Logger.log(`No URL found at row ${i}.`);
+            break;
+        }
+
+        var htmlCode = UrlFetchApp.fetch(productUrl, {muteHttpExceptions: true}).getContentText();
+        var isOutOfStock = htmlCode.indexOf('http://schema.org/OutOfStock') > -1;
+
+        Logger.log(`Processing ${productUrl}. Out of stock: ${isOutOfStock}`);
+
+        if (label) {
+            if (!labeledProductsMap[label]) {
+                labeledProductsMap[label] = { total: 0, outOfStock: 0, uniqueUrls: [] };
+            }
+            if (!labeledProductsMap[label].uniqueUrls.includes(productUrl)) {
+                labeledProductsMap[label].uniqueUrls.push(productUrl);
+                labeledProductsMap[label].total++;
+                if (isOutOfStock) {
+                    labeledProductsMap[label].outOfStock++;
+                }
+            }
+        } else {
+            Logger.log(`No label found for URL: ${productUrl} at row ${i}.`);
+        }
+
+        var campaignName = row[2].toString();
+        var adGroupName = row[3].toString();
+
+        if (!campaignName) {
+            Logger.log(`No campaign name found at row ${i}.`);
+        }
+
+        if (!adGroupName) {
+            Logger.log(`No ad group name found at row ${i}.`);
+        }
+
+        if (campaignName.includes("Shopping")) {
+            var changeMessage = handleShoppingCampaigns(campaignName, adGroupName, isOutOfStock, i, sheet);
+            if (changeMessage) {
+                body += changeMessage + "\n";
+            }
+        } else {
+            var changeMessage = handleRegularCampaigns(campaignName, adGroupName, isOutOfStock, i, sheet);
+            if (changeMessage) {
+                body += changeMessage + "\n";
+            }
+        }
+    }
+
+    // Processing labeled products
+    for (var label in labeledProductsMap) {
+        var data = labeledProductsMap[label];
+        var percentageOutOfStock = data.outOfStock / data.total;
+        Logger.log(`Label: ${label}, Unique Products: ${data.total}, Out of Stock: ${data.outOfStock}`);
+
+        var changeMessage = "";
+        if (percentageOutOfStock >= config.threshold) {
+            changeMessage = pauseOrEnableAdGroups(sheet, label, true);
+            updateSheetStatusForLabel(sheet, label, 'Paused.');
+        } else {
+            changeMessage = pauseOrEnableAdGroups(sheet, label, false);
+            updateSheetStatusForLabel(sheet, label, 'Enabled.');
+        }
+
+        if (changeMessage) {
+            body += changeMessage + "\n";
+        }
+    }
+
+    if (body !== "Hello,\nThere are changes in the account.\n\n") {
+        MailApp.sendEmail(config.mail, 'Changes in the account.', body);
+    }
+}
+
+function handleRegularCampaigns(campaignName, adGroupName, isOutOfStock, rowNum, sheet) {
+    var message = "";
+    var campaigns = AdsApp.campaigns().withCondition(`Name = '${campaignName}'`).get();
+
+    if (campaigns.hasNext()) {
+        while (campaigns.hasNext()) {
+            var campaign = campaigns.next();
+            var adGroups = campaign.adGroups().withCondition(`Name = '${adGroupName}'`).get();
+
+            if(adGroups.hasNext()) {
+                while (adGroups.hasNext()) {
+                    var adGroup = adGroups.next();
+                    var currentStatus = adGroup.isEnabled() ? "Enabled." : "Paused.";
+                    var newStatus = isOutOfStock ? "Paused." : "Enabled.";
+
+                    if (currentStatus !== newStatus) {
+                        if (isOutOfStock) {
+                            adGroup.pause();
+                        } else {
+                            adGroup.enable();
+                        }
+                        message += `Campaign: ${campaignName}\nAdgroup: ${adGroupName}\nStatus: ${newStatus}\n`;
+                    }
+
+                    // Always update the status in the sheet
+                    sheet.getRange(rowNum, 5).setValue(newStatus);
+                }
+            } else {
+                Logger.log(`No ad groups found with the name '${adGroupName}' in campaign '${campaignName}'`);
+            }
+        }
+    } else {
+        Logger.log(`No campaigns found with the name '${campaignName}'`);
+    }
+    return message;
+}
+
+
+function handleShoppingCampaigns(campaignName, adGroupName, isOutOfStock, rowNum, sheet) {
+    var message = "";
+    var campaigns = AdsApp.shoppingCampaigns().withCondition(`Name = '${campaignName}'`).get();
+
+    if (campaigns.hasNext()) {
+        while (campaigns.hasNext()) {
+            var campaign = campaigns.next();
+            var adGroups = campaign.adGroups().withCondition(`Name = '${adGroupName}'`).get();
+
+            if (adGroups.hasNext()) {
+                while (adGroups.hasNext()) {
+                    var adGroup = adGroups.next();
+                    var currentStatus = adGroup.isEnabled() ? "Enabled." : "Paused.";
+                    var newStatus = isOutOfStock ? "Paused." : "Enabled.";
+
+                    if (currentStatus !== newStatus) {
+                        if (isOutOfStock) {
+                            adGroup.pause();
+                        } else {
+                            adGroup.enable();
+                        }
+                        message += `Campaign: ${campaignName}\nAdgroup: ${adGroupName}\nStatus: ${newStatus}\n`;
+                    }
+
+                    // Always update the status in the sheet
+                    sheet.getRange(rowNum, 5).setValue(newStatus);
+                }
+            } else {
+                Logger.log(`No ad groups found with the name '${adGroupName}' in shopping campaign '${campaignName}'`);
+            }
+        }
+    } else {
+        Logger.log(`No shopping campaigns found with the name '${campaignName}'`);
+    }
+    
+    return message;
+}
+
+
+function pauseOrEnableAdGroups(sheet, label, pause) {
+    var message = "";
+
+    // Handle regular campaigns
+    var adGroupsIterator = AdsApp.adGroups().withCondition(`LabelNames CONTAINS_ANY ['${label}']`).get();
+
+    if (adGroupsIterator.hasNext()) {
+        while (adGroupsIterator.hasNext()) {
+            var adGroup = adGroupsIterator.next();
+            var currentStatus = adGroup.isEnabled() ? "Enabled." : "Paused.";
+            var newStatus = pause ? "Paused." : "Enabled.";
+
+            if (currentStatus !== newStatus) {
+                message += `Campaign (Based on label: ${label}): ${adGroup.getCampaign().getName()}\nAdgroup: ${adGroup.getName()}\nStatus: ${newStatus}\n\n`; // added an extra line break for formatting
+                
+                // Update the sheet
+                updateSheetStatusForLabel(sheet, label, newStatus);
+
+                if (pause) {
+                    adGroup.pause();
+                } else {
+                    adGroup.enable();
+                }
+            }
+        }
+    } 
+
+    // Handle shopping campaigns
+    var shoppingCampaignsIterator = AdsApp.shoppingCampaigns().withCondition(`LabelNames CONTAINS_ANY ['${label}']`).get();
+    
+    if (shoppingCampaignsIterator.hasNext()) {
+        while (shoppingCampaignsIterator.hasNext()) {
+            var shoppingCampaign = shoppingCampaignsIterator.next();
+            var shoppingAdGroupsIterator = shoppingCampaign.adGroups().get();
+
+            if (shoppingAdGroupsIterator.hasNext()) {
+                while (shoppingAdGroupsIterator.hasNext()) {
+                    var shoppingAdGroup = shoppingAdGroupsIterator.next();
+                    var currentStatus = shoppingAdGroup.isEnabled() ? "Enabled." : "Paused.";
+                    var newStatus = pause ? "Paused." : "Enabled.";
+
+                    if (currentStatus !== newStatus) {
+                        message += `Shopping Campaign (Based on label: ${label}): ${shoppingAdGroup.getCampaign().getName()}\nAdgroup: ${shoppingAdGroup.getName()}\nStatus: ${newStatus}\n\n`; // added an extra line break for formatting
+
+                        // Update the sheet
+                        updateSheetStatusForLabel(sheet, label, newStatus);
+
+                        if (pause) {
+                            shoppingAdGroup.pause();
+                        } else {
+                            shoppingAdGroup.enable();
+                        }
+                    }
+                }
+            } 
+        }
+    } 
+
+    return message; // no trim()
+}
+
+
+
+function updateSheetStatusForLabel(sheet, label, status) {
+    var range = sheet.getRange(2, 6, 9999, 2); // Gets the range for columns F and G.
+    var values = range.getValues(); // Fetches the values in the range.
+    var labelFound = false;
+
+    for (var i = 0; i < values.length; i++) {
+        if (values[i][0] === label) {
+            values[i][1] = status;
+            labelFound = true;
+        } else if (!values[i][0]) {
+            values[i][1] = ""; // Set empty value to column G if column F is empty
+        }
+    }
+
+    if (labelFound) {
+        Logger.log(`Status updated for label '${label}' to '${status}' in the sheet.`);
+    } else {
+        Logger.log(`No rows found in the sheet for label '${label}'.`);
+    }
+
+    range.setValues(values); // Writes the modified values back to the sheet.
+}
+
