@@ -19,7 +19,7 @@ The script is fairly straight forward. There are 2 requirements for the script t
 
 Installation: Copy the spreadsheet and populate it https://docs.google.com/spreadsheets/d/1WGnUoDb0Uu5AcYNLSwp0Ilr6nLAkH5T07Ve9UGjchOg/copy
 
-Download the script from https://github.com/entromarketing/OutOfStockScript/blob/main/v1
+Download the script from https://github.com/entromarketing/OutOfStockScript/blob/main/V2
 
 Schedule the script to run daily
 
